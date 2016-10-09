@@ -21,6 +21,23 @@ import codecs
 import re
 
 
+class SubsAddStopFrameError(Exception):
+    """Base class for subs_add_stop_frame exceptions."""
+
+
+class LineMalformedError(SubsAddStopFrameError):
+    """Bogus subtitle line format. Should be: `{<number>}{<number> or none}<some
+     text> or none'."""
+
+
+class StopFrameTooLowError(SubsAddStopFrameError):
+    """Stop frame can't be lower than start frame."""
+
+
+class StartFrameTooLowError(SubsAddStopFrameError):
+    """Start frame can't be lower than previous stop-frame or startframe."""
+
+
 class Subtitles:
     def __init__(self, infile, outfile, encoding=None):
         self.infile = infile
@@ -29,6 +46,69 @@ class Subtitles:
 
     def validate_encoding(self):
         codecs.lookup(self.encoding)
+
+    def validate_sanity(self):
+        with open(self.infile, 'rb') as infile:
+            """Checks:
+            - All start-frames are there.
+            - Stop frames may be set or not, but at least their curly braces
+              must be there.
+            - Stop-frame, if it's there, is greater than the current start-frame
+              and the previous stop-frame.
+            - A subsequent start-frame is greater than the the previous stop-
+              frame and the previous start-frame.
+            """
+
+            prev_start_frame = prev_stop_frame = ''
+            prev_line_count = curr_line_count = 0
+
+            for line in infile:
+                curr_line = line.strip()
+                curr_line_count += 1
+
+                if curr_line:
+                    if re.match(r"\{[0-9]+\}\{[0-9]*\}", curr_line):
+                        curr_start_frame, curr_stop_frame = \
+                            re.match(r"\{([0-9]+)\}\{([0-9]*)\}",
+                                     curr_line).groups()
+                        # print 'curr_start_frame:', curr_start_frame,
+                        # 'curr_stop_frame:', curr_stop_frame
+
+                        if curr_stop_frame and int(curr_start_frame) >= \
+                                int(curr_stop_frame):
+                            raise StopFrameTooLowError
+                            # print "stop-frame", curr_stop_frame, "in line",
+                            # curr_line_count, "should be greater than",
+                            # curr_start_frame
+
+                        if prev_start_frame and int(prev_start_frame) >= \
+                                int(curr_start_frame):
+                            raise StartFrameTooLowError
+                            # print "start-frame", curr_start_frame, "in line",
+                            # curr_line_count, "should be greater than",
+                            # prev_start_frame, "in line", prev_line_count
+
+                        if prev_stop_frame and int(prev_stop_frame) >= \
+                                int(curr_start_frame):
+                            raise StartFrameTooLowError
+                            # print "start-frame", curr_start_frame, "in line",
+                            # curr_line_count, "should be greater than",
+                            # prev_stop_frame, "in line", prev_line_count
+
+                        # This should never happen:
+                        # if curr_stop_frame and prev_stop_frame and \
+                        #                 int(prev_stop_frame) >= \
+                        #                 int(curr_stop_frame):
+                        #     print "stop-frame", curr_stop_frame, "in line", \
+                        #         curr_line_count, "should be greater than", \
+                        #         prev_stop_frame, "in line", prev_line_count
+                        #     raise StopFrameTooLowError
+                    else:
+                        raise LineMalformedError  # error: "in curr_line_count"
+
+                    prev_start_frame = curr_start_frame
+                    prev_stop_frame = curr_stop_frame
+                    prev_line_count = curr_line_count
 
     def detect_encoding(self):
         with open(self.infile, 'rb') as infile:
@@ -41,25 +121,41 @@ class Subtitles:
             self.encoding = detector.result['encoding']
 
     def interpolate_stop_frames(self):
-        with io.open(file=self.infile, mode='r', encoding=self.encoding) as infile,\
-             io.open(file=self.outfile, mode='w', encoding=self.encoding) as outfile:
-            # rstrip() should do, but why not strip it both sides, just in case?
-            # I say strip it good, it won't hurt.
-            l1 = infile.readline().strip()
-            while infile:
-                if l1:
-                    l2 = infile.readline().strip()
-                    if l2:
-                        # The end frame is subsequent's subtitle's start frame
-                        # minus 1.
-                        t2 = int(re.search(r"^\{([0-9]+)\}", l2).group(1))
-                        outfile.write(l1.replace('}{}','}{'+str(t2-1)+'}',1)+'\n')
-                        l1 = l2
-                    else:
-                        # For the last subtitle there's no subsequent one, so
-                        # let's add an arbitrary, say, 99 frames.
-                        outfile.write(l1.replace('}{}','}{'+str(t2+99)+'}',1)+'\n')
-                        break
+        """ Add missing stop-frame in each line. This method assumes that the
+        input file was validated according to validate_sanity() method."""
+        with io.open(file=self.infile, mode='r', encoding=self.encoding) as \
+                infile, io.open(file=self.outfile, mode='w',
+                                encoding=self.encoding) as outfile:
+
+            prev_start_frame = prev_stop_frame = ''
+            for line in infile:
+                # rstrip() should do, but why not strip it both sides, just in
+                # case? I say strip it good, it won't hurt.
+                curr_line = line.strip()
+
+                if curr_line:
+                    curr_start_frame, curr_stop_frame, curr_text = \
+                        re.match(r"\{([0-9]+)\}\{([0-9]*)\}(.*)",
+                                 curr_line).groups()
+
+                    if prev_start_frame:
+                        if not prev_stop_frame:
+                            prev_stop_frame = int(curr_start_frame) - 1
+
+                        outfile.write('{%s}{%s}%s\n' % (prev_start_frame,
+                                                        prev_stop_frame,
+                                                        prev_text))
+                    prev_start_frame = curr_start_frame
+                    prev_stop_frame = curr_stop_frame
+                    prev_text = curr_text
+            else:
+                # For the last subtitle line there's no subsequent one, so
+                # if it lacks its stop-frame, let's make it its start-frame +
+                # an arbitrary, say, 99 frames.
+                if not curr_stop_frame:
+                    curr_stop_frame = int(curr_start_frame) + 99
+                outfile.write('{%s}{%s}%s\n' % (curr_start_frame,
+                                                curr_stop_frame, curr_text))
 
 
 if __name__ == '__main__':
@@ -91,7 +187,7 @@ if __name__ == '__main__':
     #   required/optional status can be told from "usage" print_help() output
     #   by the presence or lack of "[]" brackets surrounding them.
     # - Specify custom help argument.
-    # - Use parse_known_args(), early, to pick up -h/--help if it's there.
+    # - Use parse_known_args(), early, to pick up `--help' if it's there.
     #   parse_args() would produce an error if the command line was
     #   invalid/incomplete and would not let display the complete command help
     #   message due to add_help=False.
@@ -133,4 +229,5 @@ if __name__ == '__main__':
                 parser.error("Encoding '%s' is not supported." % args.encoding)
         else:
             subs.detect_encoding()
+        subs.validate_sanity()
         subs.interpolate_stop_frames()
