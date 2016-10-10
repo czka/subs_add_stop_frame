@@ -23,11 +23,17 @@ import re
 
 class SubsAddStopFrameError(Exception):
     """Base class for subs_add_stop_frame exceptions."""
+    def __init__(self, errmsg=None):
+        # I'm doing my best to follow the instructions on
+        # https://wiki.python.org/moin/WritingExceptionClasses here, but trying
+        # not to enforce any particular message on the exception caller. Let me
+        # know if you know how to do it better.
+        Exception.__init__(self, errmsg)
 
 
 class LineMalformedError(SubsAddStopFrameError):
-    """Bogus subtitle line format. Should be: `{<number>}{<number> or none}<some
-     text> or none'."""
+    """Bogus subtitle line format. Should be:
+    `{<number>}{<number> or none}<some text> or none'."""
 
 
 class StopFrameTooLowError(SubsAddStopFrameError):
@@ -35,7 +41,7 @@ class StopFrameTooLowError(SubsAddStopFrameError):
 
 
 class StartFrameTooLowError(SubsAddStopFrameError):
-    """Start frame can't be lower than previous stop-frame or startframe."""
+    """Start frame can't be lower than previous stop-frame or start-frame."""
 
 
 class Subtitles:
@@ -71,40 +77,37 @@ class Subtitles:
                         curr_start_frame, curr_stop_frame = \
                             re.match(r"\{([0-9]+)\}\{([0-9]*)\}",
                                      curr_line).groups()
-                        # print 'curr_start_frame:', curr_start_frame,
-                        # 'curr_stop_frame:', curr_stop_frame
-
-                        if curr_stop_frame and int(curr_start_frame) >= \
-                                int(curr_stop_frame):
-                            raise StopFrameTooLowError
-                            # print "stop-frame", curr_stop_frame, "in line",
-                            # curr_line_count, "should be greater than",
-                            # curr_start_frame
 
                         if prev_start_frame and int(prev_start_frame) >= \
                                 int(curr_start_frame):
-                            raise StartFrameTooLowError
-                            # print "start-frame", curr_start_frame, "in line",
-                            # curr_line_count, "should be greater than",
-                            # prev_start_frame, "in line", prev_line_count
+                            errmsg = 'Start-frame %s in input line %s should '\
+                                     'be greater than start-frame %s in input '\
+                                     'line %s.' % (curr_start_frame,
+                                                   curr_line_count,
+                                                   prev_start_frame,
+                                                   prev_line_count)
+                            raise StartFrameTooLowError(errmsg)
 
                         if prev_stop_frame and int(prev_stop_frame) >= \
                                 int(curr_start_frame):
-                            raise StartFrameTooLowError
-                            # print "start-frame", curr_start_frame, "in line",
-                            # curr_line_count, "should be greater than",
-                            # prev_stop_frame, "in line", prev_line_count
+                            errmsg = 'Start-frame %s in input line %s should '\
+                                     'be greater than stop-frame %s in input '\
+                                     'line %s.' % (curr_start_frame,
+                                                   curr_line_count,
+                                                   prev_stop_frame,
+                                                   prev_line_count)
+                            raise StartFrameTooLowError(errmsg)
 
-                        # This should never happen:
-                        # if curr_stop_frame and prev_stop_frame and \
-                        #                 int(prev_stop_frame) >= \
-                        #                 int(curr_stop_frame):
-                        #     print "stop-frame", curr_stop_frame, "in line", \
-                        #         curr_line_count, "should be greater than", \
-                        #         prev_stop_frame, "in line", prev_line_count
-                        #     raise StopFrameTooLowError
+                        if curr_stop_frame and int(curr_start_frame) >= \
+                                int(curr_stop_frame):
+                            errmsg = 'Stop-frame %s in input line %s should be'\
+                                     ' greater than its start-frame %s.' % \
+                                     (curr_stop_frame, curr_line_count,
+                                      curr_start_frame)
+                            raise StopFrameTooLowError(errmsg)
                     else:
-                        raise LineMalformedError  # error: "in curr_line_count"
+                        errmsg = 'Input line %s is malformed.' % curr_line_count
+                        raise LineMalformedError(errmsg)
 
                     prev_start_frame = curr_start_frame
                     prev_stop_frame = curr_stop_frame
@@ -121,7 +124,7 @@ class Subtitles:
             self.encoding = detector.result['encoding']
 
     def interpolate_stop_frames(self):
-        """ Add missing stop-frame in each line. This method assumes that the
+        """Add missing stop-frame in each line. This method assumes that the
         input file was validated according to validate_sanity() method."""
         with io.open(file=self.infile, mode='r', encoding=self.encoding) as \
                 infile, io.open(file=self.outfile, mode='w',
