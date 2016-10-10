@@ -53,8 +53,8 @@ class Subtitles:
         codecs.lookup(self.encoding)
 
     def validate_sanity(self):
-        """Validates basic input MicroDVD format conformance and runs sdkfjd nksd fksd
-        sanity checks against input frame numbers."""
+        """Validates basic input MicroDVD format conformance and runs sanity
+        checks against input frame numbers."""
         with open(self.infile, 'rb') as infile:
             prev_start_frame = prev_stop_frame = ''
             prev_line_count = curr_line_count = 0
