@@ -5,6 +5,10 @@
 
 import sys
 import os
+import argparse
+import io
+import codecs
+import re
 
 try:
     from chardet.universaldetector import UniversalDetector
@@ -14,11 +18,6 @@ except ImportError:
                      "`pip2'. More hints in the traceback below.\n"
                      % os.path.basename(sys.argv[0]))
     raise
-
-import argparse
-import io
-import codecs
-import re
 
 
 class SubsAddStopFrameError(Exception):
@@ -54,17 +53,9 @@ class Subtitles:
         codecs.lookup(self.encoding)
 
     def validate_sanity(self):
+        """Validates basic input MicroDVD format conformance and runs sdkfjd nksd fksd
+        sanity checks against input frame numbers."""
         with open(self.infile, 'rb') as infile:
-            """Checks:
-            - All start-frames are there.
-            - Stop frames may be set or not, but at least their curly braces
-              must be there.
-            - Stop-frame, if it's there, is greater than the current start-frame
-              and the previous stop-frame.
-            - A subsequent start-frame is greater than the the previous stop-
-              frame and the previous start-frame.
-            """
-
             prev_start_frame = prev_stop_frame = ''
             prev_line_count = curr_line_count = 0
 
@@ -124,8 +115,9 @@ class Subtitles:
             self.encoding = detector.result['encoding']
 
     def interpolate_stop_frames(self):
-        """Add missing stop-frame in each line. This method assumes that the
-        input file was validated according to validate_sanity() method."""
+        """Adds stop-frame if missing, as subsequent start-frame minus 1. This
+        method assumes that the input was validated according to
+        validate_sanity() method."""
         with io.open(file=self.infile, mode='r', encoding=self.encoding) as \
                 infile, io.open(file=self.outfile, mode='w',
                                 encoding=self.encoding) as outfile:
