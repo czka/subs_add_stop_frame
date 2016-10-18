@@ -22,12 +22,12 @@ except ImportError:
 
 class SubsAddStopFrameError(Exception):
     """Base class for subs_add_stop_frame exceptions."""
-    def __init__(self, errmsg=None):
+    def __init__(self, *errmsg):
         # I'm doing my best to follow the instructions on
         # https://wiki.python.org/moin/WritingExceptionClasses here, but trying
         # not to enforce any particular message on the exception caller. Let me
         # know if you know how to do it better.
-        Exception.__init__(self, errmsg)
+        Exception.__init__(self, *errmsg)
 
 
 class LineMalformedError(SubsAddStopFrameError):
