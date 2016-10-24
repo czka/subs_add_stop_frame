@@ -59,9 +59,8 @@ class Subtitles:
             prev_start_frame = prev_stop_frame = ''
             prev_line_count = curr_line_count = 0
 
-            for line in infile:
+            for curr_line_count, line in enumerate(infile, start=1):
                 curr_line = line.strip()
-                curr_line_count += 1
 
                 if curr_line:
                     if re.match(r"\{[0-9]+\}\{[0-9]*\}", curr_line):
@@ -115,7 +114,7 @@ class Subtitles:
             self.encoding = detector.result['encoding']
 
     def interpolate_stop_frames(self):
-        """Adds stop-frame if missing, as subsequent start-frame minus 1. This
+        """Adds stop-frame if missing, as a subsequent start-frame minus 1. This
         method assumes that the input was validated according to
         validate_sanity() method."""
         with io.open(file=self.infile, mode='r', encoding=self.encoding) as \
@@ -183,9 +182,9 @@ if __name__ == '__main__':
     #   by the presence or lack of "[]" brackets surrounding them.
     # - Specify custom help argument.
     # - Use parse_known_args(), early, to pick up `--help' if it's there.
-    #   parse_args() would produce an error if the command line was
-    #   invalid/incomplete and would not let display the complete command help
-    #   message due to add_help=False.
+    #   parse_args() would produce an error at that point, if the command line
+    #   was invalid/incomplete, and would not let display the complete command
+    #   help message due to add_help=False.
     # - Now we can add the remaining, named arguments to parser. argparse calls
     #   these "optional", so required=True is... required.
     # - Help True/False flag is now in Namespace's 1st tuple item, the rest of
@@ -224,5 +223,6 @@ if __name__ == '__main__':
                 parser.error("Encoding '%s' is not supported." % args.encoding)
         else:
             subs.detect_encoding()
+
         subs.validate_sanity()
         subs.interpolate_stop_frames()
