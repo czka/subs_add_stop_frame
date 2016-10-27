@@ -6,11 +6,7 @@ I have this bunch of half-broken MicroDVD subtitle files. Their stop-frames are 
 {100}{}Chwila.
 {225}{}Ładnie.
 {275}{}Przyniosłem ci coś.
-```
-
-<snip>
-
-```
+...
 {32100}{}Dobrze.
 {32275}{}/- Och, Jack!|/- Och, Judy!
 {32550}{}Tłumaczenie: Cholek
@@ -45,11 +41,7 @@ Now when you run the script on the few example input lines I gave above, they be
 {100}{224}Chwila.
 {225}{274}Ładnie.
 {275}{324}Przyniosłem ci coś.
-```
-
-<snip>
-
-```
+...
 {32100}{32274}Dobrze.
 {32275}{32549}/- Och, Jack!|/- Och, Judy!
 {32550}{32649}Tłumaczenie: Cholek
